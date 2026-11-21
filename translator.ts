@@ -18,6 +18,7 @@ const NO_TRANSLATION_MARKER = "[[NO_TRANSLATION]]";
 const MAX_CONCURRENT_REQUESTS = 3;
 const MAX_CACHED_ENTRIES = 2000;
 const MAX_CONTEXT_MESSAGE_LENGTH = 600;
+const WEB_REQUEST_TIMEOUT_MS = 120_000;
 const DISCORD_EPOCH = 1420070400000n;
 
 const NON_TEXT_PATTERNS = [
@@ -286,6 +287,30 @@ function describeError(status: number, data: string) {
     }
 }
 
+async function postChatCompletion(url: string, apiKey: string, body: string): Promise<{ status: number; data: string; }> {
+    if (!IS_WEB) return Native.requestChatCompletion(url, apiKey, body);
+
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+
+    const vencordMobile = (window as any).VencordMobile;
+    if (typeof vencordMobile?.nativeFetch === "function")
+        return vencordMobile.nativeFetch(url, { method: "POST", headers, body });
+
+    try {
+        const res = await fetch(url, {
+            method: "POST",
+            headers,
+            body,
+            signal: AbortSignal.timeout(WEB_REQUEST_TIMEOUT_MS)
+        });
+
+        return { status: res.status, data: await res.text() };
+    } catch (e) {
+        return { status: -1, data: String(e) };
+    }
+}
+
 function readCompletionText(data: string) {
     const content = JSON.parse(data)?.choices?.[0]?.message?.content;
 
@@ -310,7 +335,7 @@ async function translateMessage(message: Message, source: string): Promise<strin
     if (reasoningEffort && reasoningEffort !== REASONING_EFFORT_UNSET)
         body.reasoning_effort = reasoningEffort;
 
-    const { status, data } = await Native.requestChatCompletion(
+    const { status, data } = await postChatCompletion(
         getChatCompletionsUrl(endpoint),
         apiKey.trim(),
         JSON.stringify(body)
