@@ -27,7 +27,7 @@ Vencord는 소스에서 직접 빌드한 경우에만 사용자 플러그인을 
 
    ```sh
    git clone https://github.com/Vendicated/Vencord.git
-   git clone <이 저장소 주소> Vencord-AITranslate
+   git clone https://github.com/airtaxi/Vencord-AITranslate.git
    cd Vencord
    pnpm install --frozen-lockfile
    ```
